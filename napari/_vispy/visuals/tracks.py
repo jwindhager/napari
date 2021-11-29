@@ -1,4 +1,4 @@
-from vispy.scene.visuals import Compound, Line, Text
+from vispy.scene.visuals import Compound, Line, Markers, Text
 
 from ..filters.tracks import TracksFilter
 from .clipping_planes_mixin import ClippingPlanesMixin
@@ -18,7 +18,7 @@ class TracksVisual(ClippingPlanesMixin, Compound):
     def __init__(self):
         self.tracks_filter = TracksFilter()
 
-        super().__init__([Line(), Text(), Line()])
+        super().__init__([Line(), Text(), Line(), Markers()])
 
         self.attach(self.tracks_filter)
 

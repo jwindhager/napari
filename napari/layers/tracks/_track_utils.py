@@ -391,6 +391,11 @@ class TrackManager:
         return self.track_vertices[:, 0]
 
     @property
+    def track_z(self) -> np.ndarray:
+        """z coordinate associated with each track vertex"""
+        return self.track_vertices[:, 1]
+
+    @property
     def graph_times(self) -> np.ndarray:
         """time points associated with each graph vertex"""
         if self.graph_vertices is not None:

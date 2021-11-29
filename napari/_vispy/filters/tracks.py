@@ -45,8 +45,12 @@ class TracksFilter(Filter):
         void apply_track_shading() {
 
             float alpha;
+            // when z is not provided (negative) use very large radius
+            float z_distance = ($current_z >= 0 ? 2 : 1e10);
 
-            if ($a_vertex_time > $current_time + $head_length) {
+            if ($a_vertex_time > $current_time + $head_length ||
+                ($interactive == 1 && abs($current_z - $a_vertex_z) > z_distance))
+             {
                 // this is a hack to minimize the frag shader rendering ahead
                 // of the current time point due to interpolation
                 if ($a_vertex_time <= $current_time + 1){
@@ -88,10 +92,13 @@ class TracksFilter(Filter):
     def __init__(
         self,
         current_time: Union[int, float] = 0,
+        current_z: Union[int, float] = 0,
         tail_length: Union[int, float] = 30,
         head_length: Union[int, float] = 0,
         use_fade: bool = True,
+        interactive: bool = False,
         vertex_time: Union[List, np.ndarray] = None,
+        vertex_z: Union[List, np.ndarray] = None,
     ):
 
         super().__init__(
@@ -99,10 +106,13 @@ class TracksFilter(Filter):
         )
 
         self.current_time = current_time
+        self.current_z = current_z
         self.tail_length = tail_length
         self.head_length = head_length
         self.use_fade = use_fade
+        self.interactive = interactive
         self.vertex_time = vertex_time
+        self.vertex_z = vertex_z
 
     @property
     def current_time(self) -> Union[int, float]:
@@ -116,6 +126,18 @@ class TracksFilter(Filter):
         self.vshader['current_time'] = float(n)
 
     @property
+    def current_z(self) -> Union[int, float]:
+        return self._current_time
+
+    @current_z.setter
+    def current_z(self, n: Union[int, float]):
+        self._current_z = n
+        if n is None:
+            # signaling to shader that there is no z
+            n = -1
+        self.vshader['current_z'] = float(n)
+
+    @property
     def use_fade(self) -> bool:
         return self._use_fade
 
@@ -123,6 +145,15 @@ class TracksFilter(Filter):
     def use_fade(self, value: bool):
         self._use_fade = value
         self.vshader['use_fade'] = float(self._use_fade)
+
+    @property
+    def interactive(self) -> bool:
+        return self._interactive
+
+    @interactive.setter
+    def interactive(self, value: bool):
+        self._interactive = value
+        self.vshader['interactive'] = float(self._interactive)
 
     @property
     def tail_length(self) -> Union[int, float]:
@@ -153,3 +184,12 @@ class TracksFilter(Filter):
     def vertex_time(self, v_time):
         self._vertex_time = np.array(v_time).reshape(-1, 1).astype(np.float32)
         self.vshader['a_vertex_time'] = VertexBuffer(self.vertex_time)
+
+    @property
+    def vertex_z(self):
+        return self._vertex_z
+
+    @vertex_z.setter
+    def vertex_z(self, v_z):
+        self._vertex_z = np.array(v_z).reshape(-1, 1).astype(np.float32)
+        self.vshader['a_vertex_z'] = VertexBuffer(self.vertex_z)

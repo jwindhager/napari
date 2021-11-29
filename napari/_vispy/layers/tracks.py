@@ -19,6 +19,9 @@ class VispyTracksLayer(VispyBaseLayer):
         self.layer.events.display_id.connect(self._on_appearance_change)
         self.layer.events.display_tail.connect(self._on_appearance_change)
         self.layer.events.display_graph.connect(self._on_appearance_change)
+        self.layer.events.interactive_tracks.connect(
+            self._on_appearance_change
+        )
 
         self.layer.events.color_by.connect(self._on_appearance_change)
         self.layer.events.colormap.connect(self._on_appearance_change)
@@ -37,6 +40,7 @@ class VispyTracksLayer(VispyBaseLayer):
 
         # update the shaders
         self.node.tracks_filter.current_time = self.layer.current_time
+        self.node.tracks_filter.current_z = self.layer.current_z
 
         # add text labels if they're visible
         if self.node._subvisuals[1].visible:
@@ -55,12 +59,18 @@ class VispyTracksLayer(VispyBaseLayer):
         self.node.tracks_filter.use_fade = self.layer.use_fade
         self.node.tracks_filter.tail_length = self.layer.tail_length
         self.node.tracks_filter.head_length = self.layer.head_length
+        self.node.tracks_filter.interactive = self.layer.interactive_tracks
 
         # set visibility of subvisuals
         self.node._subvisuals[0].visible = self.layer.display_tail
         self.node._subvisuals[1].visible = self.layer.display_id
         self.node._subvisuals[2].visible = self.layer.display_graph
 
+        self.node._subvisuals[3].visible = self.layer.interactive_tracks
+        if self.layer.interactive_tracks:
+            self._set_markers_visuals()
+
+        # radius only activated in interactive mode
         # set the width of the track tails
         self.node._subvisuals[0].set_data(
             width=self.layer.tail_width,
@@ -70,12 +80,23 @@ class VispyTracksLayer(VispyBaseLayer):
             width=self.layer.tail_width,
         )
 
+    def _set_markers_visuals(self):
+        self.node._subvisuals[3].set_data(
+            self.layer._view_data,
+            scaling=True,
+            size=self.layer.properties.get('radius', 2),
+            edge_width=0.1,
+            edge_color=self.layer.properties.get('color', 'white'),
+            face_color='transparent',
+        )
+
     def _on_tracks_change(self):
         """Update the shader when the track data changes."""
 
         self.node.tracks_filter.use_fade = self.layer.use_fade
         self.node.tracks_filter.tail_length = self.layer.tail_length
         self.node.tracks_filter.vertex_time = self.layer.track_times
+        self.node.tracks_filter.vertex_z = self.layer.track_z
 
         # change the data to the vispy line visual
         self.node._subvisuals[0].set_data(
@@ -84,6 +105,9 @@ class VispyTracksLayer(VispyBaseLayer):
             width=self.layer.tail_width,
             color=self.layer.track_colors,
         )
+
+        if self.layer.interactive_tracks:
+            self._set_markers_visuals()
 
         # Call to update order of translation values with new dims:
         self._on_matrix_change()

@@ -2,7 +2,7 @@
 # from napari.utils.events import Event
 # from napari.utils.colormaps import AVAILABLE_COLORMAPS
 
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -156,6 +156,7 @@ class Tracks(Layer):
             display_id=Event,
             display_tail=Event,
             display_graph=Event,
+            interactive_tracks=Event,
             color_by=Event,
             colormap=Event,
             properties=Event,
@@ -180,6 +181,7 @@ class Tracks(Layer):
         self.display_id = False
         self.display_tail = True
         self.display_graph = True
+        self.interactive_tracks = False
 
         # set the data, properties and graph
         self.data = data
@@ -350,6 +352,13 @@ class Tracks(Layer):
         return time_step
 
     @property
+    def current_z(self) -> Optional[int]:
+        z_step = self._slice_indices[1]
+        if isinstance(z_step, slice):
+            return None
+        return z_step
+
+    @property
     def use_fade(self) -> bool:
         """toggle whether we fade the tail of the track, depending on whether
         the time dimension is displayed"""
@@ -484,6 +493,16 @@ class Tracks(Layer):
         self.events.display_graph()
 
     @property
+    def interactive_tracks(self) -> bool:
+        """enables tracks interactivity"""
+        return self._interactive_tracks
+
+    @interactive_tracks.setter
+    def interactive_tracks(self, value: bool):
+        self._interactive_tracks = value
+        self.events.interactive_tracks()
+
+    @property
     def color_by(self) -> str:
         return self._color_by
 
@@ -576,6 +595,15 @@ class Tracks(Layer):
     def track_times(self) -> np.ndarray:
         """time points associated with each track vertex"""
         return self._manager.track_times
+
+    @property
+    def track_z(self) -> np.ndarray:
+        return self._manager.track_z
+
+    @property
+    def track_vertices(self) -> np.ndarray:
+        """return the track vertices"""
+        return self._manager.track_vertices
 
     @property
     def graph_times(self) -> np.ndarray:
