@@ -527,7 +527,7 @@ class Tracks(Layer):
 
     def unbind_interactions(self):
         if interact in self.mouse_drag_callbacks:
-            self.mouse_double_click_callbacks.remove(interact)
+            self.mouse_drag_callbacks.remove(interact)
             # TODO unbind 'Shift' key (is this possible?)
 
     @property
