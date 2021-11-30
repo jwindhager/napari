@@ -12,6 +12,7 @@ from ...utils.events import Event
 from ...utils.translations import trans
 from ..base import Layer
 from ._track_utils import TrackManager
+from ._tracks_mouse_bindings import interact
 
 
 class Tracks(Layer):
@@ -91,6 +92,7 @@ class Tracks(Layer):
     _max_tracks_thumbnail = 1024
     _max_length = 300
     _max_width = 20
+    _max_click_radius = 5
 
     def __init__(
         self,
@@ -173,6 +175,12 @@ class Tracks(Layer):
 
         # use this to update shaders when the displayed dims change
         self._current_displayed_dims = None
+
+        # track id used for data additing
+        self._current_track_id = None
+
+        # index of selected track node
+        self._selected_data: int = None
 
         # track display properties
         self.tail_width = tail_width
@@ -500,7 +508,27 @@ class Tracks(Layer):
     @interactive_tracks.setter
     def interactive_tracks(self, value: bool):
         self._interactive_tracks = value
+        if value:
+            self.bind_interactions()
+        else:
+            self.unbind_interactions()
         self.events.interactive_tracks()
+
+    @staticmethod
+    def _update_selection(layer):
+        layer._current_track_id = max(layer._manager.track_ids) + 1
+        yield
+        layer._current_track_id = None
+        layer._selected_data = None
+
+    def bind_interactions(self):
+        self.mouse_drag_callbacks.append(interact)
+        self.bind_key('Shift', self._update_selection)
+
+    def unbind_interactions(self):
+        if interact in self.mouse_drag_callbacks:
+            self.mouse_double_click_callbacks.remove(interact)
+            # TODO unbind 'Shift' key (is this possible?)
 
     @property
     def color_by(self) -> str:
@@ -621,3 +649,60 @@ class Tracks(Layer):
 
         padded_positions = self._pad_display_data(positions)
         return labels, padded_positions
+
+    def add(
+        self, coord: Union[List, np.ndarray], track_id: Optional[int] = None
+    ) -> int:
+        if track_id is None:
+            track_id = max(self._manager.track_ids) + 1
+        coord = np.atleast_2d(np.insert(coord, 0, track_id))
+        self.data = np.append(self.data, coord, axis=0)
+        return track_id
+
+    def select(self, coord: Union[List, np.ndarray]) -> Optional[int]:
+        coord = np.array(coord)
+
+        time_point = coord[0]
+        (selected,) = np.nonzero(
+            np.abs(self._manager.track_times - time_point) < 1
+        )
+        if len(selected) == 0:
+            return None
+
+        closest = np.argmin(
+            np.abs(
+                self._manager.track_vertices[selected][:, 1:] - coord[-3:]
+            ).sum(axis=1)
+        )
+        index = selected[closest]
+        distance = np.linalg.norm(
+            self._manager.track_vertices[index, 1:] - coord[-3:]
+        )
+        if distance > self._max_click_radius:
+            return None
+
+        return index
+
+    def remove(self, index: int):
+        if index < len(self.data) - 1:
+            track_id = self._manager.track_ids[index]
+            last_half = self.data[index + 1 :]
+            new_track_id = max(self._manager.track_ids) + 1
+            last_half[last_half[:, 0] == track_id, 0] = new_track_id
+
+            first_half = self.data[:index]
+            self.data = np.concatenate((first_half, last_half), axis=0)
+        else:
+            # no track splitting for last track node
+            self.data = self.data[:index]
+
+    def move(self, index: int, coord: Union[List, np.ndarray]):
+        data = self.data
+        data[index, 2:] = np.array(coord[-3:])
+        self.data = data
+
+    def join(self, from_index: int, to_index: int):
+        track_ids = self._manager.track_ids
+        data = self.data
+        data[track_ids == track_ids[to_index], 0] = track_ids[from_index]
+        self.data = data
