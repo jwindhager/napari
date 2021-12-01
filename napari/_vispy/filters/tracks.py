@@ -127,7 +127,7 @@ class TracksFilter(Filter):
 
     @property
     def current_z(self) -> Union[int, float]:
-        return self._current_time
+        return self._current_z
 
     @current_z.setter
     def current_z(self, n: Union[int, float]):
