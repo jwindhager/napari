@@ -42,11 +42,18 @@ class TracksFilter(Filter):
 
     VERT_SHADER = """
         varying vec4 v_track_color;
+        varying float v_size;
+
         void apply_track_shading() {
 
             float alpha;
+
+            float max_distance = 3;
             // when z is not provided (negative) use very large radius
-            float z_distance = ($current_z >= 0 ? 2 : 1e10);
+            float z_distance = ($current_z >= 0 ? max_distance : 1e10);
+
+            float size_factor = 1.0 - abs($current_z - $a_vertex_z) / max_distance;
+            v_size = clamp(size_factor, 0.0, 1.0) * v_size;
 
             if ($a_vertex_time > $current_time + $head_length ||
                 ($interactive == 1 && abs($current_z - $a_vertex_z) > z_distance))
@@ -77,15 +84,20 @@ class TracksFilter(Filter):
 
     FRAG_SHADER = """
         varying vec4 v_track_color;
+        varying float v_size;
+
         void apply_track_shading() {
 
             // if the alpha is below the threshold, discard the fragment
-            if( v_track_color.a <= 0.0 ) {
+            if( v_track_color.a <= 0.0 || v_size <= 0.0) {
                 discard;
             }
 
             // interpolate
             gl_FragColor.a = clamp(v_track_color.a * gl_FragColor.a, 0.0, 1.0);
+
+            // FIXME: not working because lines don't have PointSize;
+            // gl_PointSize = v_size;
         }
     """
 
